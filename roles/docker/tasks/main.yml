@@ -1,0 +1,73 @@
+--- 
+- name: Install specific packages
+  package:
+    name:
+      - ca-certificates 
+      - curl 
+      - gnupg
+      - docker-ce 
+      - docker-ce-cli 
+      - containerd.io 
+      - docker-buildx-plugin 
+      - docker-compose-plugin
+      - docker-compose
+      - python3-pip 
+      - python3-requests
+      - python3-docker
+      - software-properties-common
+      - python3-pip
+      - virtualenv
+      - python3-setuptools
+    state: latest
+
+- name: add user to docker group
+  become: yes
+  command: "usermod -a -G docker {{ ansible_user }}"
+  changed_when: true
+  loop_control:
+    loop_var: user
+    label: '{{ ansible_user }}'
+
+- name: docker root directory exists
+  ansible.builtin.file:
+    path: "{{ dockerApps }}"
+    state: directory
+    mode: "{{ dockerRootPermission }}"
+    owner: root
+    group: docker
+
+- name: docker root directory exists
+  ansible.builtin.file:
+    path: "{{ dockerData }}"
+    state: directory
+    mode: "{{ dockerRootPermission }}"
+    owner: root
+    group: docker
+  
+- name: Copy docker files
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/roles/docker/files/"
+    dest: "{{ dockerApps }}/"
+    owner: root
+    group: docker
+    mode: "{{ dockerRootPermission }}"
+
+- name: Stop docker services
+  shell: "docker-compose -f {{ item.path }} down"
+  with_items: "{{ docker_compose  }}"
+  ignore_errors: true
+  register: output
+
+- name: Show docker stop results
+  ansible.builtin.debug:
+    var: output
+
+- name: Start docker services
+  shell: "docker-compose -f {{ item.path }} up -d"
+  with_items: "{{ docker_compose  }}"
+  ignore_errors: true
+  register: output
+
+- name: Show docker start results
+  ansible.builtin.debug:
+    var: output

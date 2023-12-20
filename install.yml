@@ -1,0 +1,22 @@
+---
+
+- name: misc task on nodes
+  hosts: "*"
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  tasks:
+    - debug: var=ansible_host
+
+- hosts: all_servers
+  gather_facts: yes
+  vars:
+    docker_compose:
+      - { path: "{{ dockerApps }}/duplicati/docker-compose.yaml" }
+      - { path: "{{ dockerApps }}/portainer-agent/docker-compose.yaml" }
+  roles:
+    - role: prereq
+      become: true
+    - role: raspberrypi
+      become: true
+    - role: docker
+      become: true

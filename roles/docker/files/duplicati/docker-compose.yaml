@@ -1,0 +1,17 @@
+# https://hub.docker.com/r/linuxserver/duplicati
+version: "2.1"
+services:
+  duplicati:
+    image: lscr.io/linuxserver/duplicati:latest
+    container_name: duplicati
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Sao_Paulo
+      - CLI_ARGS= #optional
+    volumes:
+      - /docker/data/duplicati/config:/config
+      - /export:/source
+    ports:
+      - 8200:8200
+    restart: unless-stopped

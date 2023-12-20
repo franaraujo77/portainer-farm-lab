@@ -1,0 +1,7 @@
+---
+# Set your timezone
+system_timezone: "America/Sao_Paulo"
+
+dockerApps: "/docker/apps"
+dockerData: "/docker/data"
+dockerRootPermission: "0775"
