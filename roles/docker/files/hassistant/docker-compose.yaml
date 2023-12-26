@@ -1,0 +1,178 @@
+version: '3'
+services:
+  homeassistant:
+    container_name: hass
+    image: homeassistant/home-assistant:stable
+    volumes:
+      #- ./hass-config:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DOCKER_APPS}/hassistant/hass-config/configuration.yaml:/config/configuration.yaml
+      - homeassistant-config:/config
+      - frigate-config:/etc/frigate:ro
+      - frigate-media:/media/frigate
+    restart: unless-stopped
+    network_mode: host
+    healthcheck:
+      test: 'curl -m 90 -sLf http://localhost:8123 || date >> /config/healthcheck' #| pkill -9 python3'
+      interval: 90s
+      timeout: 60s
+      retries: 2
+    ports:
+      - "8123:8123"
+    depends_on:
+      - mariadb
+      - mqtt
+  mariadb:
+    image: linuxserver/mariadb:latest
+    container_name: mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: ha_db
+      MYSQL_USER: homeassistant
+      MYSQL_PASSWORD: "${HA_MYSQL_PASSWORD}"
+      PUID: 1000
+      PGID: 1000
+    volumes:
+      - mariadb-data:/config
+    ports:
+      - "3306:3306"
+  nodered:
+    container_name: nodered
+    image: nodered/node-red:latest
+    ports:
+      - "1880:1880"
+    volumes:
+      - nodered-data:/data
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - homeassistant
+      - mqtt
+    environment:
+      TZ: ${TIMEZONE}
+    restart: unless-stopped
+  mqtt:
+    #https://www.emqx.io/docs/en/latest/deploy/install-docker.html
+    image: emqx/emqx:latest
+    container_name: emqx
+    restart: unless-stopped
+    ports:
+      - 1883:1883
+      - 8083:8083
+      - 8084:8084
+      - 8883:8883
+      - 18083:18083
+    volumes:
+      - mqtt-config:/opt/emqx/etc
+      - mqtt-data:/opt/emqx/data
+      - mqtt-log:/opt/emqx/log
+    environment:
+      - "EMQX_NAME=emqx"
+      - "EMQX_NODE_NAME=emqx@node1.emqx.io"
+      - "EMQX_CLUSTER__DISCOVERY_STRATEGY=static"
+      - "EMQX_CLUSTER__STATIC__SEEDS=[emqx@node1.emqx.io]"
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
+      interval: 5s
+      timeout: 25s
+      retries: 5
+    networks:
+      emqx-bridge:
+        aliases:
+        - node1.emqx.io
+    user: "${PUID}:${PGID}"
+  esphome:
+      container_name: esphome
+      # This is a custom build for now. Based on https://github.com/esphome/esphome/pull/671
+      #image: esphome-dev
+      #image: esphome/esphome:2021.10.3
+      image: esphome/esphome:latest
+      environment:
+          - TZ=${TIMEZONE}
+      volumes:
+          - esphome-config/:/config:rw
+          # Use local time for logging timestamps
+          - /etc/localtime:/etc/localtime:ro
+      devices:
+        - /dev/ttyUSB0
+      network_mode: host
+      restart: "always"
+      privileged: true
+  vscode:
+      container_name: vscode
+      image: ghcr.io/hassio-addons/vscode/amd64:stable
+      restart: always
+      volumes:
+          - vscode-data:/data/vscode
+          - homeassistant-config:/config/homeassistant
+          - frigate-config:/config/frigate
+          - esphome-config/:/config/esphome
+      ports:
+          - 8443:8443
+      environment:
+          - TZ=${TIMEZONE}
+  frigate:
+      container_name: frigate
+      privileged: true
+      restart: always
+      #image: ghcr.io/blakeblackshear/frigate:stable
+      image: ghcr.io/blakeblackshear/frigate:0.13.0-beta6
+      shm_size: "128mb"
+      devices:
+          - /dev/bus/usb:/dev/bus/usb
+      volumes:
+          - /etc/localtime:/etc/localtime:ro
+          - frigate-config/:/config
+          - frigate-media:/media/frigate
+      ports:
+          # Two below needed for Home Assistant
+          - "127.0.0.1:5000:5000"
+          - "127.0.0.1:8554:8554"
+          # Two below needed for 2way stream
+          - "8555:8555/tcp"
+          - "8555:8555/udp"
+          - "127.0.0.1:1984:1984"
+      environment:
+          - PLUS_API_KEY=secret
+          - TZ=${TIMEZONE}
+  hass-configurator:
+    image: "causticlab/hass-configurator-docker:arm"
+    container_name: hass-configurator
+    restart: unless-stopped
+    ports:
+      - "3218:3218/tcp"
+    depends_on:
+      - homeassistant
+    volumes:
+      - configurator-config:/config
+      - homeassistant-config:/hass-config
+    user: "${PUID}:${PGID}"
+
+networks:
+  emqx-bridge:
+    driver: bridge
+
+volumes:
+  homeassistant-config:
+    driver: local
+  mariadb-data:
+    driver: local
+  mqtt-config:
+    driver: local
+  mqtt-data:
+    driver: local
+  mqtt-log:
+    driver: local
+  vscode-data:
+    driver: local
+  nodered-data:
+    driver: local
+  configurator-config:
+    driver: local
+  esphome-config:
+    driver: local
+  frigate-config:
+    driver: local
+  frigate-media:
+    driver: local
