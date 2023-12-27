@@ -8,6 +8,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - ${DOCKER_APPS}/hassistant/hass-config/configuration.yaml:/config/configuration.yaml
+      - ${DOCKER_APPS}/hassistant/hass-config/secrets.yaml:/config/secrets.yaml
       - homeassistant-config:/config
       - frigate-config:/etc/frigate:ro
       - frigate-media:/media/frigate
@@ -94,6 +95,8 @@ services:
           - esphome-config/:/config:rw
           # Use local time for logging timestamps
           - /etc/localtime:/etc/localtime:ro
+      ports:
+        - 6052:6052
       devices:
         - /dev/ttyUSB0
       network_mode: host
