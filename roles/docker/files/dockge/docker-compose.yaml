@@ -1,0 +1,23 @@
+version: "3.8"
+services:
+  dockge:
+    container_name: dockge
+    image: louislam/dockge:latest
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - 5001:5001
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dockge-data:/app/data
+      - /root/.docker/:/root/.docker
+      - ${dockerApps}:${dockerApps}
+    environment:
+      # Tell Dockge where is your stacks directory
+      - DOCKGE_STACKS_DIR=${dockerApps}
+      - PUID=${PUID}
+      - PGID=${PGID}
+
+volumes:
+  dockge-data:
+    driver: local
