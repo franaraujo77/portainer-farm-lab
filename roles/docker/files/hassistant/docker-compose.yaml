@@ -1,15 +1,20 @@
 version: '3'
 services:
   nginx:
+    container_name: nginx
     image: arm64v8/nginx
     ports:
       - "80:80"
     volumes:
       - ${DOCKER_APPS}/hassistant/nginx-config/conf.d:/etc/nginx/conf.d:ro
       - ${DOCKER_APPS}/hassistant/nginx-config/wwwroot:/var/www/root:ro
+    restart: unless-stopped
+    networks:
+      local:
+        ipv4_address: "10.10.80.2"
   homeassistant:
     container_name: hass
-    image: homeassistant/home-assistant:stable
+    image: ghcr.io/home-assistant/home-assistant:stable
     volumes:
       #- ./hass-config:/config
       - /etc/localtime:/etc/localtime:ro
@@ -18,8 +23,11 @@ services:
       - ${DOCKER_APPS}/hassistant/hass-config/secrets.yaml:/config/secrets.yaml
       - homeassistant-config:/config
       - frigate-config:/etc/frigate:ro
-      - frigate-media:/media/frigate
+      - ${mountPoint}/recognition/frigate:/media/frigate
     restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
     healthcheck:
       test: 'curl -m 90 -sLf http://localhost:8123 || date >> /config/healthcheck' #| pkill -9 python3'
       interval: 90s
@@ -27,6 +35,11 @@ services:
       retries: 2
     ports:
       - "8123:8123"
+    networks:
+      local:
+        ipv4_address: "10.10.80.3"
+    extra_hosts:
+      - "frigate:${NFS_HOST_IP}"
     depends_on:
       - mariadb
       - mqtt
@@ -45,11 +58,17 @@ services:
       - mariadb-data:/config
     ports:
       - "3306:3306"
+    networks:
+      local:
+        ipv4_address: "10.10.80.4"
   nodered:
     container_name: nodered
-    image: nodered/node-red:latest
+    image: nodered/node-red:latest-18
     ports:
       - "1880:1880"
+    networks:
+      local:
+        ipv4_address: "10.10.80.5"
     volumes:
       - nodered-data:/data
       - /etc/localtime:/etc/localtime:ro
@@ -70,6 +89,9 @@ services:
       - 8084:8084
       - 8883:8883
       - 18083:18083
+    networks:
+      local:
+        ipv4_address: "10.10.80.6"
     volumes:
       - mqtt-config:/opt/emqx/etc
       - mqtt-data:/opt/emqx/data
@@ -91,64 +113,45 @@ services:
       environment:
           - TZ=${TIMEZONE}
       volumes:
-          - esphome-config/:/config:rw
+          - esphome-config:/config:rw
           # Use local time for logging timestamps
           - /etc/localtime:/etc/localtime:ro
       ports:
         - 6052:6052
+      networks:
+        local:
+          ipv4_address: "10.10.80.7"
       devices:
         - /dev/ttyUSB0
-      restart: "always"
+      restart: unless-stopped
       privileged: true
   vscode:
       container_name: vscode
       image: ghcr.io/linuxserver/code-server:latest
-      restart: always
+      restart: unless-stopped
       volumes:
-          - vscode-data:/data/vscode
-          - homeassistant-config:/config/homeassistant
-          - frigate-config:/config/frigate
-          - esphome-config/:/config/esphome
+        - vscode-data:/data/vscode
+        - homeassistant-config:/config/homeassistant
+        - ${DOCKER_APPS}/hassistant/hass-config/configuration.yaml:/config/homeassistant/configuration.yaml
+        - ${DOCKER_APPS}/hassistant/hass-config/secrets.yaml:/config/homeassistant/secrets.yaml
+        - ${DOCKER_APPS}/hassistant/frigate-config/config.yml:/config/frigate/config.yml
+        - frigate-config:/config/frigate
+        - esphome-config:/config/esphome
       ports:
           - 8443:8443
+      networks:
+        local:
+          ipv4_address: "10.10.80.8"
       environment:
           - TZ=${TIMEZONE}
-  frigate:
-      container_name: frigate
-      privileged: true
-      restart: always
-      #image: ghcr.io/blakeblackshear/frigate:stable
-      image: ghcr.io/blakeblackshear/frigate:0.13.0-beta6
-      shm_size: "128mb"
-      devices:
-          - /dev/bus/usb:/dev/bus/usb
-      volumes:
-          - /etc/localtime:/etc/localtime:ro
-          - frigate-config/:/config
-          - frigate-media:/media/frigate
-      ports:
-          # Two below needed for Home Assistant
-          - "127.0.0.1:5000:5000"
-          - "127.0.0.1:8554:8554"
-          # Two below needed for 2way stream
-          - "8555:8555/tcp"
-          - "8555:8555/udp"
-          - "127.0.0.1:1984:1984"
-      environment:
-          - PLUS_API_KEY=secret
-          - TZ=${TIMEZONE}
-  hass-configurator:
-    image: "causticlab/hass-configurator-docker:arm"
-    container_name: hass-configurator
-    restart: unless-stopped
-    ports:
-      - "3218:3218/tcp"
-    depends_on:
-      - homeassistant
-    volumes:
-      - configurator-config:/config
-      - homeassistant-config:/hass-config
-    user: "${PUID}:${PGID}"
+
+networks:
+  local:
+    driver: bridge
+    ipam:
+     config:
+       - subnet: 10.10.80.0/24
+         gateway: 10.10.80.1
 
 volumes:
   homeassistant-config:

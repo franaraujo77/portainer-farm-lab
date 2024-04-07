@@ -1,6 +1,6 @@
 server {
     listen 80;
-    server_name hass.karva.work;         #replace this
+    server_name example.com;         #replace this
     proxy_buffering off;
 
     location ~ . {
