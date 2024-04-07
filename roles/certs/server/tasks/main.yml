@@ -1,0 +1,20 @@
+---
+- name: Delete content & directory
+  ansible.builtin.file:
+    state: absent
+    path: "{{ certFolder }}/"
+
+- name: garantee that directory exists
+  ansible.builtin.file:
+    path: "{{ certFolder }}"
+    state: directory
+    mode: "{{ certFolderPermissions }}"
+    owner: root
+    group: docker
+  
+- name: Copy cert files to server
+  ansible.builtin.copy:
+    src: "{{ certLocalFolder }}/"
+    dest: "{{ certFolder }}"
+    owner: root
+    group: docker

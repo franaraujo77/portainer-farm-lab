@@ -1,0 +1,158 @@
+---
+- name: Delete content & directory
+  ansible.builtin.file:
+    state: absent
+    path: "{{ certFolder }}/"
+
+- name: garantee that directory exists
+  ansible.builtin.file:
+    path: "{{ certFolder }}"
+    state: directory
+    mode: "{{ certFolderPermissions }}"
+    owner: root
+    group: docker
+
+- name: Copy cert files to server
+  ansible.builtin.copy:
+    src: "{{ certLocalFolder }}/master/"
+    dest: "{{ certFolder }}"
+    owner: root
+    group: docker
+
+- name: Create SERVER private key (RSA, 4096 bits)
+  command: >
+    openssl genrsa -out {{ certFolder }}/server-key.pem 4096
+
+- name: "Generate the SERVER CSR file signed with the private key"
+  command: >
+    openssl req -subj '/CN={{ ansible_default_ipv4.address }}' -sha256 \
+    -new -key {{ certFolder }}/server-key.pem \
+    -out {{ certFolder }}/server.csr
+
+- name: Create server extfile
+  file:
+    state: touch 
+    path: "{{ certFolder }}/extfile.cnf"
+
+- name: Add alt name to server extfile
+  lineinfile:
+    dest: "{{ certFolder }}/extfile.cnf"
+    line: "subjectAltName = {{ certSubjectAltName }}{{ ansible_default_ipv4.address }}"
+
+- name: "Sign the SERVER CSR file as a CA to turn it into a certificate"
+  command: >
+    openssl x509 -req -days 365 -sha256 -in {{ certFolder }}/server.csr \
+    -CA {{ certFolder }}/ca.pem \
+    -CAkey {{ certFolder }}/ca-key.pem \
+    -CAcreateserial -out {{ certFolder }}/server-cert.pem \
+    -extfile {{ certFolder }}/extfile.cnf \
+    -passin pass:{{ certPassphrase }}
+
+- name: Create CLIENT private key (RSA, 4096 bits)
+  command: >
+    openssl genrsa -out {{ certFolder }}/key.pem 4096
+
+- name: "Generate the CLIENT CSR file signed with the private key"
+  command: >
+    openssl req -subj '/CN=client' -new -key {{ certFolder }}/key.pem -out {{ certFolder }}/client.csr
+
+- name: Create client extfile
+  file:
+    state: touch 
+    path: "{{ certFolder }}/client-extfile.cnf"
+
+- name: Add alt name to client  extfile
+  lineinfile:
+    dest: "{{ certFolder }}/client-extfile.cnf"
+    line: "extendedKeyUsage = clientAuth"
+
+- name: "Sign the CLIENT CSR file as a CA to turn it into a certificate"
+  command: >
+    openssl x509 -req -days 365 -sha256 \
+    -in {{ certFolder }}/client.csr \
+    -CA {{ certFolder }}/ca.pem \
+    -CAkey {{ certFolder }}/ca-key.pem \
+    -CAcreateserial -out {{ certFolder }}/cert.pem \
+    -extfile {{ certFolder }}/client-extfile.cnf \
+    -passin pass:{{ certPassphrase }}
+
+- name: Remove server extfile
+  file:
+    state: absent
+    path: "{{ certFolder }}/extfile.cnf" 
+
+- name: Remove client extfile
+  file:
+    state: absent
+    path: "{{ certFolder }}/client-extfile.cnf" 
+
+- name: Delete CLIENT CSR
+  ansible.builtin.file:
+    state: absent
+    path: "{{ certFolder }}/client.csr"
+
+- name: Delete SERVER CSR
+  ansible.builtin.file:
+    state: absent
+    path: "{{ certFolder }}/server.csr"
+
+- name: Register cert files to fetch
+  shell: (cd {{ certFolder }}; find . -maxdepth 1 -type f) | cut -d'/' -f2 | egrep '^(key|cert|ca)\.(pem)$'
+  register: files_to_copy
+
+- name: Fetch cert files from nodes
+  fetch: flat=true src={{ certFolder }}/{{ item }} dest={{ certLocalFolder }}/{{ ansible_default_ipv4.address }}/
+  with_items: "{{ files_to_copy.stdout_lines }}"
+
+- name: Creating docker config file with content
+  copy:
+    dest: "{{ dockerConfigHome }}/daemon.json"
+    content: |
+      {
+        "registry-mirrors": [
+          "https://docker.mirrors.ustc.edu.cn"
+        ]
+      }
+
+- name: Disable docker old startup script
+  copy: remote_src=True src=/lib/systemd/system/docker.service dest=/lib/systemd/system/docker.service.old
+  ignore_errors: true
+  when:
+    - not skipDockerServiceOverride
+
+- name: Create docker service override directory
+  file:
+    path: /lib/systemd/system/docker.service.d
+    state: directory
+    owner: root
+    group: root
+    recurse: yes
+  when:
+    - not skipDockerServiceOverride
+
+- name: Delete old docker config
+  ansible.builtin.file:
+    state: absent
+    path: "/lib/systemd/system/docker.service.d/override.conf"
+  when:
+    - not skipDockerServiceOverride
+
+- name: Install docker override file
+  template:
+    src: override.conf.j2
+    dest: "/lib/systemd/system/docker.service.d/override.conf"
+    backup: no
+    owner: root
+    group: root
+    mode: 0644
+  when:
+    - not skipDockerServiceOverride
+
+
+- name: Reload systemd daemon and restart Docker
+  systemd:
+    name: docker
+    state: restarted
+    daemon_reload: yes
+  when:
+    - not skipDockerRestart

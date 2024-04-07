@@ -1,0 +1,8 @@
+# ansible managed
+[Service]
+ExecStart=
+{% if dockerTlsVerify|default(true) -%}
+ExecStart=/usr/bin/dockerd  -H fd:// -H tcp://0.0.0.0:{{ dockerPort }} --tlsverify --tlscacert={{ certFolder }}/ca.pem --tlscert={{ certFolder }}/server-cert.pem --tlskey={{ certFolder }}/server-key.pem
+{% else -%}
+ExecStart=/usr/bin/dockerd -H fd://
+{% endif -%}

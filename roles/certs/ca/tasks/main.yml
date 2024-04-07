@@ -1,0 +1,35 @@
+---
+- name: Delete content & directory
+  ansible.builtin.file:
+    state: absent
+    path: "{{ certFolder }}/"
+
+- name: garantee that directory exists
+  ansible.builtin.file:
+    path: "{{ certFolder }}"
+    state: directory
+    mode: "{{ certFolderPermissions }}"
+    owner: root
+    group: docker
+
+- name: Create CA private key (RSA, 4096 bits)
+  command: >
+    openssl genrsa -aes256 \
+    -passout pass:{{ certPassphrase }} \
+    -out {{ certFolder }}/ca-key.pem 4096
+
+- name: Create CA self-signed certificate
+  command: >
+    openssl req -new -x509 -days 365 \
+    -key {{ certFolder }}/ca-key.pem -sha256 \
+    -out {{ certFolder }}/ca.pem \
+    -passin pass:{{ certPassphrase }} \
+    -subj '/CN={{ ansible_default_ipv4.address }}'
+
+- name: Register cert files to fetch
+  shell: (cd {{ certFolder }}; find . -maxdepth 1 -type f) | cut -d'/' -f2
+  register: files_to_copy
+
+- name: Fetch cert files from nodes
+  fetch: flat=true src={{ certFolder }}/{{ item }} dest={{ certLocalFolder }}/master/
+  with_items: "{{ files_to_copy.stdout_lines }}"

@@ -1,0 +1,26 @@
+---
+
+- name: misc task on nodes
+  hosts: "*"
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  tasks:
+    - debug: var=ansible_host
+
+- hosts: server
+  gather_facts: yes
+  roles:
+    - role: certs/ca
+      become: true
+
+- hosts: nodes
+  gather_facts: yes
+  roles:
+    - role: certs/nodes
+      become: true
+
+- hosts: server
+  gather_facts: yes
+  roles:
+    - role: certs/server
+      become: true
