@@ -1,0 +1,71 @@
+version: '3.8'
+
+networks:
+  front-tier:
+  back-tier:
+
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    networks:
+      - back-tier
+      - front-tier
+    environment:
+        - TZ=${TIMEZONE}
+        - PUID=${PUID}
+        - PGID=${PGID}
+        - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+        - DS_PROMETHEUS=Prometheus
+    volumes:
+      - ${dockerApps}/grafana/grafana-config/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    env_file:
+      - ${dockerApps}/grafana/grafana-config/config/config.monitoring
+    extra_hosts:
+      - "prometheus0001:${prometheus0001}"
+      - "prometheus0002:${prometheus0002}"
+      - "prometheus0003:${prometheus0003}"
+      - "prometheus0004:${prometheus0004}"
+      - "prometheus0005:${prometheus0005}"
+      - "prometheus0006:${prometheus0006}"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    volumes:
+      - ${dockerApps}/grafana/prometheus-config/prometheus.yaml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=360h'
+      - '--web.enable-lifecycle'
+    ports:
+      - 9090:9090
+    networks:
+      - back-tier
+    extra_hosts:
+      - "prometheus0001:${prometheus0001}"
+      - "prometheus0002:${prometheus0002}"
+      - "prometheus0003:${prometheus0003}"
+      - "prometheus0004:${prometheus0004}"
+      - "prometheus0005:${prometheus0005}"
+      - "prometheus0006:${prometheus0006}"
+    environment:
+        - TZ=${TIMEZONE}
+        - PUID=${PUID}
+        - PGID=${PGID}
+
+volumes:
+  grafana-data:
+    driver: local
+  prometheus_data: {}
