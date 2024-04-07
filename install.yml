@@ -7,16 +7,69 @@
   tasks:
     - debug: var=ansible_host
 
-- hosts: all_servers
+- hosts: nodes
   gather_facts: yes
   vars:
     docker_compose:
       - { path: "{{ dockerApps }}/duplicati/docker-compose.yaml" }
       - { path: "{{ dockerApps }}/portainer-agent/docker-compose.yaml" }
+      - { path: "{{ dockerApps }}/dockge/docker-compose.yaml" }
+      - { path: "{{ dockerApps }}/monitor/docker-compose.yaml" }
+      - { path: "{{ dockerApps }}/autoheal/docker-compose.yaml" }
   roles:
     - role: prereq
       become: true
     - role: raspberrypi
       become: true
+    - role: docker
+      become: true
+
+- hosts: server_00001
+  gather_facts: yes
+  vars:
+    docker_compose:
+      - { path: "{{ dockerApps }}/jellyfin/docker-compose.yaml" }
+  roles:
+    - role: docker
+      become: true
+
+- hosts: server_00005
+  gather_facts: yes
+  vars:
+    docker_compose:
+      - { path: "{{ dockerApps }}/recognition/docker-compose.yaml" }
+  roles:
+    - role: nfs/server
+      become: true
+    - role: docker
+      become: true
+
+- hosts: server_00004
+  gather_facts: yes
+  vars:
+    nfs_host_ip: "{{ NFS_HOST_IP }}"
+    docker_compose:
+      - { path: "{{ dockerApps }}/hassistant/docker-compose.yaml" }
+  roles:
+    - role: nfs/client
+      become: true
+    - role: docker
+      become: true
+
+- hosts: server_00003
+  gather_facts: yes
+  vars:
+    docker_compose:
+      - { path: "{{ dockerApps }}/grafana/docker-compose.yaml" }
+  roles:
+    - role: docker
+      become: true
+
+- hosts: server_00006
+  gather_facts: yes
+  vars:
+    docker_compose:
+      - { path: "{{ dockerApps }}/wud/docker-compose.yaml" }
+  roles:
     - role: docker
       become: true
