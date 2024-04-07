@@ -3,7 +3,7 @@ version: "3"
 
 services:
   portainer-agent:
-    image: portainer/agent:2.19.3
+    image: portainer/agent:latest
     ports:
       - 9001:9001
     volumes:
