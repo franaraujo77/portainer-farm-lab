@@ -1,0 +1,165 @@
+#https://github.com/jakowenko/double-take?tab=readme-ov-file
+
+# enable authentication for ui and api (default: shown below)
+auth: false
+
+# enable mqtt subscribing and publishing (default: shown below)
+mqtt:
+  host: mqtt:1883
+  username: doubletake
+  password:
+  client_id: double-take
+
+  topics:
+    # mqtt topic for frigate message subscription
+    frigate: frigate/events
+    #  mqtt topic for home assistant discovery subscription
+    homeassistant: homeassistant
+    # mqtt topic where matches are published by name
+    matches: double-take/matches
+    # mqtt topic where matches are published by camera name
+    cameras: double-take/cameras
+
+# global detect settings (default: shown below)
+detect:
+  match:
+    # save match images
+    save: true
+    # include base64 encoded string in api results and mqtt messages
+    # options: true, false, box
+    base64: false
+    # minimum confidence needed to consider a result a match
+    confidence: 60
+    # hours to keep match images until they are deleted
+    purge: 168
+    # minimum area in pixels to consider a result a match
+    min_area: 1500
+
+  unknown:
+    # save unknown images
+    save: true
+    # include base64 encoded string in api results and mqtt messages
+    # options: true, false, box
+    base64: false
+    # minimum confidence needed before classifying a name as unknown
+    confidence: 40
+    # hours to keep unknown images until they are deleted
+    purge: 8
+    # minimum area in pixels to keep an unknown result
+    min_area: 1500
+
+# frigate settings (default: shown below)
+frigate:
+  url: http://frigate:5000
+
+  # if double take should send matches back to frigate as a sub label
+  # NOTE: requires frigate 0.11.0+
+  update_sub_labels: false
+
+  # stop the processing loop if a match is found
+  # if set to false all image attempts will be processed before determining the best match
+  stop_on_match: true
+
+  # ignore detected areas so small that face recognition would be difficult
+  # quadrupling the min_area of the detector is a good start
+  # does not apply to MQTT events
+  min_area: 1500
+
+  # object labels that are allowed for facial recognition
+  labels:
+    - person
+
+  attempts:
+    # number of times double take will request a frigate latest.jpg for facial recognition
+    latest: 10
+    # number of times double take will request a frigate snapshot.jpg for facial recognition
+    snapshot: 10
+    # process frigate images from frigate/+/person/snapshot topics
+    mqtt: true
+    # add a delay expressed in seconds between each detection loop
+    delay: 0
+
+  image:
+    # height of frigate image passed for facial recognition
+    height: 500
+
+  # only process images from specific cameras
+  cameras:
+    - tapo
+
+  # only process images from specific zones
+  #zones:
+    # - camera: garage
+    #   zone: driveway
+
+  # override frigate attempts and image per camera
+  #events:
+    # front-door:
+    #   attempts:
+    #     # number of times double take will request a frigate latest.jpg for facial recognition
+    #     latest: 5
+    #     # number of times double take will request a frigate snapshot.jpg for facial recognition
+    #     snapshot: 5
+    #     # process frigate images from frigate/<camera-name>/person/snapshot topic
+    #     mqtt: false
+    #     # add a delay expressed in seconds between each detection loop
+    #     delay: 1
+
+    #   image:
+    #     # height of frigate image passed for facial recognition (only if using default latest.jpg and snapshot.jpg)
+    #     height: 1000
+    #     # custom image that will be used in place of latest.jpg
+    #     latest: http://camera-url.com/image.jpg
+    #     # custom image that will be used in place of snapshot.jpg
+    #     snapshot: http://camera-url.com/image.jpg
+
+# detector settings (default: shown below)
+detectors:
+  deepstack:
+    url: http://deepstack-server:5050
+    # key:
+    # number of seconds before the request times out and is aborted
+    timeout: 15
+    # require opencv to find a face before processing with detector
+    opencv_face_required: True
+    # only process images from specific cameras, if omitted then all cameras will be processed
+    # cameras:
+    #   - front-door
+    #   - garage# time settings (default: shown below)
+
+# opencv settings (default: shown below)
+# docs: https://docs.opencv.org/4.6.0/d1/de5/classcv_1_1CascadeClassifier.html
+opencv:
+  scale_factor: 1.05
+  min_neighbors: 4.5
+  min_size_width: 30
+  min_size_height: 30
+
+# time settings (default: shown below)
+time:
+  # defaults to iso 8601 format with support for token-based formatting
+  # https://github.com/moment/luxon/blob/master/docs/formatting.md#table-of-tokens
+  format: yyyy-LL-dd TTT
+  # time zone used in logs
+  timezone: America/Sao_Paulo
+
+# log settings (default: shown below)
+# options: silent, error, warn, info, http, verbose, debug, silly
+logs:
+  level: info
+
+# ui settings (default: shown below)
+ui:
+  # base path of ui
+  path:
+  pagination:
+    # number of results per page
+    limit: 50
+  thumbnails:
+    # value between 0-100
+    quality: 95
+    # value in pixels
+    width: 500
+  logs:
+    # number of lines displayed
+    lines: 500

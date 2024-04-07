@@ -1,0 +1,99 @@
+mqtt:
+  host: mqtt # endereço do home assistant (tenho instalado o addon Mosquitto Broker)
+  enabled: True
+  port: 1883
+  client_id: frigate
+  
+detectors:
+  #cpu1:
+  #  type: cpu
+  #  num_threads: 3
+  rknn: # required
+    type: rknn # required
+    # core mask for npu
+    #core_mask: 0 #default
+    core_mask: 0b111
+
+model: # required
+  # name of yolov8 model or path to your own .rknn model file
+  # possible values are:
+  # - default-yolov8n
+  # - default-yolov8s
+  # - default-yolov8m
+  # - default-yolov8l
+  # - default-yolov8x
+  # - /config/model_cache/rknn/your_custom_model.rknn
+  path: default-yolov8x
+  # width and height of detection frames
+  #width: 320
+  #height: 320
+  # pixel format of detection frame
+  # default value is rgb but yolov models usually use bgr format
+  input_pixel_format: bgr # required
+  # shape of detection frame
+  #input_tensor: nhwc
+
+#logger:
+#  default: debug
+#  logs:
+#    frigate.mqtt: error
+#    ffmpeg.tapo: debug
+
+record:
+  enabled: false
+  retain: 
+    days: 0
+    mode: motion
+  events:
+    pre_capture: 15
+    post_capture: 15
+    retain:
+      default: 0
+      mode: motion
+      objects:
+        dog: 0
+
+snapshots: # decidi salvar apenas fotos dos eventos em que foi detectado os objetos acima, mas podem ser gravados videos também
+  enabled: true
+  timestamp: false
+  bounding_box: false
+  crop: false
+  retain:
+    default: 2
+
+objects: # abaixo vc identifica os objetos que serão analizados e rastreados
+  track:
+    - person # detecta pessoas
+    - dog # detecta cachorros
+  filters:
+    person:
+      min_score: 0.5
+      threshold: 0.8
+    dog:
+      min_score: 0.5
+      threshold: 0.6
+
+#ffmpeg:
+  # if you want to decode a h265 (hevc) stream
+  #hwaccel_args: preset-rk-h265
+  # if you want to decode a h264 stream
+  #hwaccel_args: preset-rk-h264
+
+cameras:
+  tapo:
+    ffmpeg:
+      inputs:
+        - path: rtsp://hassio:A!w!941pm_S9i$z@192.168.15.32/stream2 # url da sua camera, os formatos são variados
+          input_args: preset-rtsp-generic
+          hwaccel_args: preset-rk-h264
+          #output_args:
+          #  detect: -f rawvideo
+          #  record: -c:a aac -c:v copy -map 0 -f segment -strftime 1 -segment_time 60 -segment_format mp4 -reset_timestamps 1
+          #  rtmp: -c copy -f flv -flvflags no_duration_filesize
+          roles:
+            - detect 
+            - record
+    #width: 1440 # resolução da sua camera, vc pode reduzir a resolução mas tem que manter a proporção, no caso a minha é 1280x720
+    #height: 900
+    #fps: 5 # é recomendado 5fps acima disso será utilizado mais CPU sem necessidade para detecção
+    
