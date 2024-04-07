@@ -1,0 +1,22 @@
+---    
+- name: Install specific packages
+  package:
+    name:
+      - nfs-common
+    state: latest
+
+- name: garantee mount point directory existence
+  ansible.builtin.file:
+    path: "{{ mountShare }}"
+    state: directory
+    mode: "{{ mountSharePermission }}"
+    owner: ksys
+    group: ksys
+
+- name: Configure and mount NFS volume
+  ansible.posix.mount:
+    src: "{{ nfs_host_ip }}:{{ mountShare }}"
+    path: "{{ mountPoint }}"
+    opts: rw,sync,hard
+    state: mounted
+    fstype: nfs

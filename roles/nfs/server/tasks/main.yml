@@ -1,0 +1,38 @@
+---    
+- name: Install specific packages
+  package:
+    name:
+      - nfs-kernel-server
+      - rpcbind
+      - ufw
+    state: latest
+
+- name: Configure ssh access
+  shell:
+    cmd: "ufw allow ssh "
+
+- name: share directory exists
+  ansible.builtin.file:
+    path: "{{ mountShare }}"
+    state: directory
+    mode: "{{ mountSharePermission }}"
+    owner: nobody
+    group: nogroup
+
+- name: share in /etc/exports file
+  ansible.builtin.lineinfile:
+    path: /etc/exports
+    state: present
+    line: '{{ mountShare }} {{ mountShareOptions }}'
+  notify: restart NFS server
+
+- name: export share
+  ansible.builtin.command: "exportfs -rav"
+
+- name: Configure NFS access
+  shell:
+    cmd: "ufw allow from  {{ mountShareOrigin }} to any port nfs "
+
+- name: Enable UFW
+  shell:
+    cmd: "ufw --force enable"
